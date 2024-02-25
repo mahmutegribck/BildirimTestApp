@@ -1,6 +1,7 @@
 ﻿using System.Reflection;
 using BildirimTestApp.Server.Models;
 using BildirimTestApp.Server.Servisler.Bildirim.Hublar;
+using BildirimTestApp.Server.Servisler.Kullanici;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
 using Newtonsoft.Json;
@@ -186,13 +187,10 @@ public class PeriyodikBildirimOkuyucu : BackgroundService
     {
         if (outbox.GonderimDenemeSayisi <= kOutboxDenemeSayisi)
         {
+            var bildirimGonderilecekKullanici = await kullaniciBilgiServisi.GetKullaniciBilgi(outbox.Bildirim.GonderilecekKullaniciId);
             await anlikBildirimHubContext
-                .Clients.Group(
-                    kullaniciBilgiServisi
-                        .GetKullaniciBilgi(outbox.Bildirim.GonderilecekKullaniciId)
-                        .KullaniciAdi
-                )
-                .SendAsync(fonksiyonIsim, bildirim);
+                .Clients.Group(bildirimGonderilecekKullanici.KullaniciAdi).SendAsync(fonksiyonIsim, bildirim);
+
             testDbContext.SisBildirimOutboxes.Remove(outbox);
             testDbContext.SaveChanges();
             outbox.Bildirim.GonderimDurumu = 1;

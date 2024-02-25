@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Authorization;
+﻿using BildirimTestApp.Server.Servisler.Kullanici;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.Extensions.Logging;
 
@@ -27,9 +28,10 @@ public class BildirimHubKok : Hub
         if (kullaniciAdi == null)
             throw new Exception("kullanici adı bulunamadı.");
 
-        var kullaniciBilgi = kullaniciBilgiServisi.TryGetKullaniciBilgi(kullaniciAdi);
+        var kullaniciBilgi = await kullaniciBilgiServisi.TryGetKullaniciBilgi(kullaniciAdi);
         if (kullaniciBilgi == null)
             throw new Exception("Kullanici bilgisi bulunamadı");
+
 
         lock (BagliKullaniciIdler)
         {
@@ -52,10 +54,12 @@ public class BildirimHubKok : Hub
         }
 
         await Groups.RemoveFromGroupAsync(Context.ConnectionId, kullaniciAdi);
+        var sisKullanici = await kullaniciBilgiServisi.GetKullaniciBilgi(kullaniciAdi);
+
         lock (BagliKullaniciIdler)
         {
             BagliKullaniciIdler.Remove(
-                kullaniciBilgiServisi.GetKullaniciBilgi(kullaniciAdi).KullaniciId
+                sisKullanici.KullaniciId
             );
         }
 

@@ -1,5 +1,7 @@
 using BildirimTestApp.Server.Models;
 using BildirimTestApp.Server.Servisler.Bildirim;
+using BildirimTestApp.Server.Servisler.Kullanici;
+using BildirimTestApp.Server.Servisler.OturumYonetimi;
 
 namespace BildirimTestApp.Server;
 
@@ -18,6 +20,13 @@ public class Program
 
         builder.Services.AddDbContext<TestDbContext>();
         builder.Services.BildirimEkle(builder.Environment.IsDevelopment(), builder.Configuration);
+
+        builder.Services.AddHostedService<PeriyodikBildirimOkuyucu>();
+
+        builder.Services.AddScoped<IKullaniciBilgiServisi, KullaniciBilgiServisi>();
+        builder.Services.AddScoped<IOturumYonetimiServisi, OturumYonetimiServisi>();
+
+
 
         var app = builder.Build();
 
