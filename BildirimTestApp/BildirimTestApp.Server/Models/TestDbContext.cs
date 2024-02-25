@@ -1,12 +1,16 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Threading;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Metadata;
+using Microsoft.Extensions.Caching.Memory;
 
 namespace BildirimTestApp.Server.Models
 {
     public partial class TestDbContext : DbContext
     {
+        private readonly IMemoryCache _cache;
+
         public virtual DbSet<SisBildirim> SisBildirims { get; set; } = null!;
         public virtual DbSet<SisBildirimIcerik> SisBildirimIceriks { get; set; } = null!;
         public virtual DbSet<SisBildirimOutbox> SisBildirimOutboxes { get; set; } = null!;
@@ -19,6 +23,31 @@ namespace BildirimTestApp.Server.Models
         public TestDbContext(DbContextOptions<TestDbContext> options) : base(options)
         {
         }
+
+        public override async Task<int> SaveChangesAsync(CancellationToken cancellationToken = default)
+        {
+
+            var result = await base.SaveChangesAsync(cancellationToken);
+
+            if (result != 0)
+            {
+                var sisBildirimOutboxes = await SisBildirimOutboxes.ToListAsync(cancellationToken);
+                _cache.Set("SisBildirimOutboxes", sisBildirimOutboxes);
+            }
+
+            return result;
+        }
+
+        //public override int SaveChanges()
+        //{
+        //    var result = base.SaveChanges();
+        //    if (result != 0)
+        //    {
+        //        var sisBildirimOutboxes = SisBildirimOutboxes.ToList();
+        //        _cache.Set("SisBildirimOutboxes", sisBildirimOutboxes);
+        //    }
+        //    return result;
+        //}
 
         protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
         {

@@ -4,6 +4,7 @@ using BildirimTestApp.Server.Servisler.Bildirim.Hublar;
 using BildirimTestApp.Server.Servisler.Kullanici;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Memory;
 using Newtonsoft.Json;
 
 namespace BildirimTestApp.Server.Servisler.Bildirim;
@@ -15,14 +16,20 @@ public class PeriyodikBildirimOkuyucu : BackgroundService
     private readonly ILogger<PeriyodikBildirimOkuyucu> logger;
     private Type[] donusturucuTipler;
     private Type[] bildirimTipler;
+    private readonly TestDbContext _context;
+
+    private readonly IMemoryCache _memoryCache;
+
 
     public PeriyodikBildirimOkuyucu(
         IServiceProvider serviceProvider,
-        ILogger<PeriyodikBildirimOkuyucu> logger
+        ILogger<PeriyodikBildirimOkuyucu> logger,
+        IMemoryCache memoryCache
     )
     {
         this.serviceProvider = serviceProvider;
         this.logger = logger;
+        _memoryCache = memoryCache;
         donusturucuTipler = Assembly
             .GetExecutingAssembly()
             .GetTypes()
@@ -46,6 +53,11 @@ public class PeriyodikBildirimOkuyucu : BackgroundService
 
     private async Task BildirimleriIsle(CancellationToken cancellationToken)
     {
+        BildirimHubKok.BagliKullaniciIdler.Add(1);
+        BildirimHubKok.BagliKullaniciIdler.Add(2);
+        BildirimHubKok.BagliKullaniciIdler.Add(3);
+        BildirimHubKok.BagliKullaniciIdler.Add(4);
+        BildirimHubKok.BagliKullaniciIdler.Add(5);
         var bagliKullaniciIdler = BildirimHubKok.BagliKullaniciIdler;
 
         if (bagliKullaniciIdler.Count == 0)
@@ -55,30 +67,57 @@ public class PeriyodikBildirimOkuyucu : BackgroundService
         }
 
         // di
-        var testDbContext = serviceProvider.GetRequiredService<TestDbContext>();
-        var kullaniciBilgiServisi = serviceProvider.GetRequiredService<IKullaniciBilgiServisi>();
-        var anlikBildirimHubContext = serviceProvider.GetRequiredService<
+        using var scope = serviceProvider.CreateScope();
+        var testDbContext = scope.ServiceProvider.GetRequiredService<TestDbContext>();
+        var kullaniciBilgiServisi = scope.ServiceProvider.GetRequiredService<IKullaniciBilgiServisi>();
+        var anlikBildirimHubContext = scope.ServiceProvider.GetRequiredService<
             IHubContext<AnlikBildirimHub>
         >();
 
-        await testDbContext
-            .SisKullanicis.Where(x => bagliKullaniciIdler.Contains(x.KullaniciId))
-            .Select(x => x.KullaniciId)
-            .ToArrayAsync(cancellationToken);
 
-        var bildirimler = await testDbContext
-            .SisBildirimOutboxes.Where(x =>
-                bagliKullaniciIdler.Contains(x.Bildirim.GonderilecekKullaniciId)
-            )
-            .Select(x => new
-            {
-                x.Bildirim,
-                x.Bildirim.BildirimIcerik,
-                Outbox = x
-            })
-            .ToArrayAsync();
 
-        foreach (var bildirim in bildirimler)
+        #region
+        //await testDbContext
+        //    .SisKullanicis.Where(x => bagliKullaniciIdler.Contains(x.KullaniciId))
+        //    .Select(x => x.KullaniciId)
+        //    .ToArrayAsync(cancellationToken);
+
+        //var bildirimlerTest = await testDbContext
+        //    .SisBildirimOutboxes.Where(x =>
+        //        bagliKullaniciIdler.Contains(x.Bildirim.GonderilecekKullaniciId)
+        //    )
+        //    .Select(x => new
+        //    {
+        //        x.Bildirim,
+        //        x.Bildirim.BildirimIcerik,
+        //        Outbox = x
+        //    })
+        //    .ToArrayAsync();
+
+        //var sisBildirimOutboxes1 = _memoryCache.Get<List<SisBildirimOutbox>>("SisBildirimOutboxes");
+        #endregion
+
+
+
+        var sisBildirimOutboxes = await _memoryCache.GetOrCreateAsync("SisBildirimOutboxes", async entry =>
+        {
+            var bildirimler = await testDbContext.SisBildirimOutboxes.ToListAsync();
+            entry.SetValue(bildirimler);
+            return bildirimler.AsQueryable();
+        });
+
+        var kullaniciBildirimleri = await sisBildirimOutboxes
+        .Where(x => bagliKullaniciIdler.Contains(1))
+        .Select(x => new
+        {
+            x.Bildirim, // Get Bildirim
+            x.Bildirim.BildirimIcerik,
+            Outbox = x
+        }).ToArrayAsync();
+
+
+
+        foreach (var bildirim in kullaniciBildirimleri)
         {
             var bildirimSerilestirmeKonteyner =
                 JsonConvert.DeserializeObject<BildirimSerilestirmeKonteyner>(

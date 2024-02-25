@@ -26,6 +26,7 @@ public class Program
         builder.Services.AddScoped<IKullaniciBilgiServisi, KullaniciBilgiServisi>();
         builder.Services.AddScoped<IOturumYonetimiServisi, OturumYonetimiServisi>();
 
+        builder.Services.AddMemoryCache();
 
 
         var app = builder.Build();
